@@ -26,6 +26,7 @@ public partial class App : Application
     private const int ExitStartupFailure = 1;
     private const int ExitSmokeTimeout = 2;
     private const int ExitAgentNotEmbedded = 3;
+    private const int ExitShutdownHung = 4;
 
     /// <summary>How long the smoke test lets the app run after its first render.</summary>
     private static readonly TimeSpan SmokeSettleTime = TimeSpan.FromSeconds(3);
@@ -33,11 +34,21 @@ public partial class App : Application
     /// <summary>How long the smoke test waits for a first render before giving up.</summary>
     private static readonly TimeSpan SmokeRenderTimeout = TimeSpan.FromSeconds(60);
 
+    /// <summary>
+    /// How long orderly teardown may take. Stopping a stream sends the agent its shutdown and turns the
+    /// phone's screen back on, which is bounded at a few seconds, so this leaves comfortable headroom.
+    /// </summary>
+    private static readonly TimeSpan DisposeTimeout = TimeSpan.FromSeconds(8);
+
+    /// <summary>Hard limit on exiting, after which the process is terminated outright.</summary>
+    private static readonly TimeSpan ExitWatchdogTimeout = TimeSpan.FromSeconds(12);
+
     private ILoggerFactory? _loggerFactory;
     private ILogger? _logger;
     private MainViewModel? _viewModel;
     private FileLoggerProvider? _fileLogger;
     private Timer? _smokeWatchdog;
+    private Timer? _exitWatchdog;
     private string? _smokeSettingsPath;
     private bool _smokeTest;
     private volatile bool _startupComplete;
@@ -218,8 +229,7 @@ public partial class App : Application
                 _logger?.LogCritical(
                     "Smoke test failed: the main window did not render within {Seconds} seconds.",
                     SmokeRenderTimeout.TotalSeconds);
-                _fileLogger?.Flush(TimeSpan.FromSeconds(2));
-                Environment.Exit(ExitSmokeTimeout);
+                Terminate(ExitSmokeTimeout);
             },
             null,
             SmokeRenderTimeout,
@@ -267,9 +277,38 @@ public partial class App : Application
     {
         _smokeWatchdog?.Dispose();
 
+        // Last resort: whatever happens below, the process ends. A hung exit would leave a zombie
+        // DexStream.exe behind, and one that still held the phone's USB interface would stop the next
+        // launch, and adb, from connecting at all.
+        _exitWatchdog = new Timer(
+            _ =>
+            {
+                _logger?.LogCritical(
+                    "Shutdown did not finish within {Seconds} seconds; terminating.",
+                    ExitWatchdogTimeout.TotalSeconds);
+                Terminate(ExitShutdownHung);
+            },
+            null,
+            ExitWatchdogTimeout,
+            Timeout.InfiniteTimeSpan);
+
         if (_viewModel is not null)
         {
-            _viewModel.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            // Bounded, and safe to block on: nothing in the disposal chain resumes on this thread.
+            Task disposal = _viewModel.DisposeAsync().AsTask();
+            try
+            {
+                if (!disposal.Wait(DisposeTimeout))
+                {
+                    _logger?.LogWarning(
+                        "Teardown did not finish within {Seconds} seconds; exiting anyway.",
+                        DisposeTimeout.TotalSeconds);
+                }
+            }
+            catch (AggregateException ex)
+            {
+                _logger?.LogWarning(ex.InnerException ?? ex, "Teardown failed; exiting anyway.");
+            }
         }
 
         if (_smokeSettingsPath is not null)
@@ -284,9 +323,25 @@ public partial class App : Application
             }
         }
 
+        _logger?.LogInformation("Shut down cleanly.");
+        _exitWatchdog?.Dispose();
         _loggerFactory?.Dispose();
         _fileLogger?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Ends the process immediately with <paramref name="exitCode"/>, after flushing the log.
+    /// </summary>
+    /// <remarks>
+    /// For watchdogs only. <see cref="Environment.Exit(int)"/> runs process-exit handlers, some of which
+    /// WPF registers and which can need the very UI thread that is stuck, so it can hang in exactly the
+    /// situation a watchdog exists for. TerminateProcess cannot.
+    /// </remarks>
+    private void Terminate(int exitCode)
+    {
+        _fileLogger?.Flush(TimeSpan.FromSeconds(2));
+        TerminateProcess(GetCurrentProcess(), (uint)exitCode);
     }
 
     // --- Win32 -------------------------------------------------------------------------------------
@@ -298,4 +353,11 @@ public partial class App : Application
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "MessageBoxW")]
     private static extern int MessageBoxW(IntPtr owner, string text, string caption, uint type);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool TerminateProcess(IntPtr process, uint exitCode);
 }

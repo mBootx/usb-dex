@@ -167,7 +167,7 @@ jobs:
           }
 
           if (-not $finished) { throw 'The app did not exit within 120 seconds.' }
-          $meaning = @{ 1 = 'an unhandled exception'; 2 = 'the window never rendered'; 3 = 'the agent is not embedded' }
+          $meaning = @{ 1 = 'an unhandled exception'; 2 = 'the window never rendered'; 3 = 'the agent is not embedded'; 4 = 'shutdown hung' }
           if ($process.ExitCode -ne 0) {
             throw "Smoke test failed with exit code $($process.ExitCode): $($meaning[$process.ExitCode])."
           }

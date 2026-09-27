@@ -423,7 +423,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
         _coordinator.AgentLog -= OnAgentLog;
         _coordinator.SessionChanged -= OnSessionChanged;
 
-        await _coordinator.DisposeAsync();
+        // Nothing after this touches UI state, and it must not resume on the dispatcher: the app
+        // disposes this while shutting down, when the UI thread is blocked waiting for it, so a
+        // continuation queued back to that thread would never run and the process would hang on exit.
+        await _coordinator.DisposeAsync().ConfigureAwait(false);
     }
 }
 
