@@ -1,2 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The agent's build scripts run under bash. On a Windows checkout, text=auto would give them CRLF
+# line endings, which breaks the shebang line and makes them fail with a confusing "bad interpreter".
+*.sh text eol=lf
+
+# Batch files are the opposite case: cmd.exe wants CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
