@@ -55,6 +55,12 @@ public sealed record StreamSessionOptions
     /// <summary>Explicit display id to capture. Null selects automatically.</summary>
     public int? DisplayId { get; init; }
 
+    /// <summary>
+    /// Reuse the ADB key that <c>adb</c> already uses, so a device that has authorized it connects
+    /// without showing its trust prompt again.
+    /// </summary>
+    public bool ReuseSystemAdbKey { get; init; } = true;
+
     /// <summary>Interval between control-channel pings, which drive the clock and latency estimates.</summary>
     public TimeSpan PingInterval { get; init; } = TimeSpan.FromSeconds(1);
 

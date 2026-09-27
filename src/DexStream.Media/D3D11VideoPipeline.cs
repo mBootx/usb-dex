@@ -61,6 +61,7 @@ public sealed class D3D11VideoPipeline : IDisposable
     private int _processorSourceHeight;
     private int _processorTargetWidth;
     private int _processorTargetHeight;
+    private ScalingMode _scaling = ScalingMode.Fit;
     private bool _awaitingKeyFrame = true;
     private bool _disposed;
 
@@ -115,8 +116,24 @@ public sealed class D3D11VideoPipeline : IDisposable
 
     public int ClientHeight { get; private set; }
 
-    /// <summary>How the image is fitted into the window.</summary>
-    public ScalingMode Scaling { get; set; } = ScalingMode.Fit;
+    /// <summary>
+    /// How the image is fitted into the window. Setting it recomputes the viewport immediately, so a
+    /// change applies to the next presented frame rather than waiting for a resize.
+    /// </summary>
+    public ScalingMode Scaling
+    {
+        get => _scaling;
+        set
+        {
+            if (_scaling == value)
+            {
+                return;
+            }
+
+            _scaling = value;
+            RebuildViewport();
+        }
+    }
 
     /// <summary>Where the image sits inside the window, for mapping mouse coordinates.</summary>
     public Viewport Viewport { get; private set; } = Viewport.Empty;

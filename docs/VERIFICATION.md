@@ -36,7 +36,9 @@ These run in CI on Linux and Windows, and can be run locally with `dotnet test`.
   with nothing but a JDK, and `agent/build.sh` compiles it against the real platform `android.jar`
   and converts it with `d8`.
 - **Both deliverables are produced by CI**: the single-file executable and the MSI are build
-  artifacts of every green run, so neither is a claim about a script that was never executed.
+  artifacts of every green run, so neither is a claim about a script that was never executed. The
+  Windows job takes the agent jar from the agent job and refuses to continue if it is absent, so a
+  published executable always has the agent embedded.
 
 The Media Foundation and Direct3D 11 code is written against API signatures read out of the Vortice
 assemblies by reflection rather than from memory, so the names, overloads and struct layouts are

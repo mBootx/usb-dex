@@ -49,6 +49,7 @@ public sealed record AppSettings
         TurnPhoneScreenOff = TurnPhoneScreenOff,
         RequireDexDisplay = RequireDexDisplay,
         ActivateDexIfMissing = ActivateDexIfMissing,
+        ReuseSystemAdbKey = ReuseSystemAdbKey,
     };
 }
 

@@ -52,12 +52,58 @@ jobs:
           path: artifacts/test-results
           if-no-files-found: ignore
 
+  # The device agent is plain javac plus d8, so it needs no Gradle. The stub type-check needs only a
+  # JDK and fails fast; the real build produces the jar that gets embedded in the host executable.
+  agent:
+    name: Device agent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Type-check against the Android stubs
+        run: agent/verify.sh
+
+      - name: Build the agent jar
+        run: agent/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dexstream-agent
+          path: agent/build/dexstream-agent.jar
+          if-no-files-found: error
+
   # Authoritative leg: the whole solution including the WPF app, plus both shipping artifacts.
   windows:
     name: Full build, tests and package (Windows)
     runs-on: windows-latest
+
+    # The app embeds the device agent so the portable executable is self-contained, which means the jar
+    # has to exist before the app is built. Taking it from the agent job avoids needing the Android SDK
+    # on the Windows runner as well.
+    needs: agent
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch the device agent
+        uses: actions/download-artifact@v4
+        with:
+          name: dexstream-agent
+          path: agent/build
+
+      - name: Confirm the agent will be embedded
+        shell: pwsh
+        run: |
+          $jar = 'agent/build/dexstream-agent.jar'
+          if (-not (Test-Path $jar)) {
+            throw "$jar is missing, so the published executable would not contain the device agent."
+          }
+          "Agent present: {0:N0} bytes" -f (Get-Item $jar).Length
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -119,29 +165,4 @@ jobs:
         with:
           name: DexStream-installer
           path: artifacts/installer/DexStream.msi
-          if-no-files-found: error
-
-  # The device agent is plain javac plus d8, so it needs no Gradle. The stub type-check needs only a
-  # JDK and fails fast; the real build produces the jar that gets embedded in the host executable.
-  agent:
-    name: Device agent
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Type-check against the Android stubs
-        run: agent/verify.sh
-
-      - name: Build the agent jar
-        run: agent/build.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dexstream-agent
-          path: agent/build/dexstream-agent.jar
           if-no-files-found: error

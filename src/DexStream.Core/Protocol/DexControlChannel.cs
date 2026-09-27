@@ -31,10 +31,13 @@ public sealed class DexControlChannel : IAsyncDisposable
     private readonly Stream _stream;
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
-    private readonly byte[] _scratch = new byte[DexControlEncoder.MaxFixedMessageSize];
 
     private long _pingSequence;
+    private long _clipboardSequence;
     private bool _disposed;
+
+    /// <summary>Encodes a fixed-size message into <paramref name="buffer"/> and returns its length.</summary>
+    private delegate int EncodeFixedMessage(byte[] buffer);
 
     public DexControlChannel(Stream stream, ILogger<DexControlChannel>? logger = null)
     {
@@ -50,7 +53,7 @@ public sealed class DexControlChannel : IAsyncDisposable
 
     /// <summary>Sends the control channel handshake. Must be the first thing written.</summary>
     public Task SendHandshakeAsync(CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteHandshake(_scratch), cancellationToken);
+        => WriteFixedAsync(buffer => DexControlEncoder.WriteHandshake(buffer), cancellationToken);
 
     public Task SendKeyEventAsync(
         DexKeyAction action,
@@ -59,7 +62,7 @@ public sealed class DexControlChannel : IAsyncDisposable
         int repeat = 0,
         CancellationToken cancellationToken = default)
         => WriteFixedAsync(
-            DexControlEncoder.WriteKeyEvent(_scratch, action, androidKeyCode, repeat, metaState),
+            buffer => DexControlEncoder.WriteKeyEvent(buffer, action, androidKeyCode, repeat, metaState),
             cancellationToken);
 
     public Task SendPointerEventAsync(
@@ -74,8 +77,8 @@ public sealed class DexControlChannel : IAsyncDisposable
         DexPointerButtons buttons,
         CancellationToken cancellationToken = default)
         => WriteFixedAsync(
-            DexControlEncoder.WritePointerEvent(
-                _scratch, action, pointerId, x, y, displayWidth, displayHeight,
+            buffer => DexControlEncoder.WritePointerEvent(
+                buffer, action, pointerId, x, y, displayWidth, displayHeight,
                 pressure, actionButton, buttons),
             cancellationToken);
 
@@ -89,31 +92,34 @@ public sealed class DexControlChannel : IAsyncDisposable
         DexPointerButtons buttons,
         CancellationToken cancellationToken = default)
         => WriteFixedAsync(
-            DexControlEncoder.WriteScroll(
-                _scratch, x, y, displayWidth, displayHeight, horizontalScroll, verticalScroll, buttons),
+            buffer => DexControlEncoder.WriteScroll(
+                buffer, x, y, displayWidth, displayHeight, horizontalScroll, verticalScroll, buttons),
             cancellationToken);
 
     public Task RequestKeyFrameAsync(CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteRequestKeyFrame(_scratch), cancellationToken);
+        => WriteFixedAsync(buffer => DexControlEncoder.WriteRequestKeyFrame(buffer), cancellationToken);
 
     public Task SetBitrateAsync(int bitsPerSecond, CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteSetBitrate(_scratch, bitsPerSecond), cancellationToken);
+        => WriteFixedAsync(
+            buffer => DexControlEncoder.WriteSetBitrate(buffer, bitsPerSecond), cancellationToken);
 
     public Task SetDisplayPowerAsync(bool on, CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteSetDisplayPower(_scratch, on), cancellationToken);
+        => WriteFixedAsync(
+            buffer => DexControlEncoder.WriteSetDisplayPower(buffer, on), cancellationToken);
 
     public Task SendSystemActionAsync(DexSystemAction action, CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteSystemAction(_scratch, action), cancellationToken);
+        => WriteFixedAsync(
+            buffer => DexControlEncoder.WriteSystemAction(buffer, action), cancellationToken);
 
     public Task ShutdownAgentAsync(CancellationToken cancellationToken = default)
-        => WriteFixedAsync(DexControlEncoder.WriteShutdown(_scratch), cancellationToken);
+        => WriteFixedAsync(buffer => DexControlEncoder.WriteShutdown(buffer), cancellationToken);
 
     /// <summary>Sends a ping and returns the sequence number to match against the pong.</summary>
     public async Task<long> SendPingAsync(long hostTimestampUs, CancellationToken cancellationToken = default)
     {
         long sequence = Interlocked.Increment(ref _pingSequence);
         await WriteFixedAsync(
-            DexControlEncoder.WritePing(_scratch, sequence, hostTimestampUs),
+            buffer => DexControlEncoder.WritePing(buffer, sequence, hostTimestampUs),
             cancellationToken).ConfigureAwait(false);
         return sequence;
     }
@@ -126,7 +132,7 @@ public sealed class DexControlChannel : IAsyncDisposable
 
     public Task SetClipboardAsync(string text, bool paste, CancellationToken cancellationToken = default)
     {
-        long sequence = Interlocked.Increment(ref _pingSequence);
+        long sequence = Interlocked.Increment(ref _clipboardSequence);
         return WriteVariableAsync(
             DexControlEncoder.MeasureSetClipboard(text),
             (buffer) => DexControlEncoder.WriteSetClipboard(buffer, sequence, paste, text),
@@ -199,18 +205,37 @@ public sealed class DexControlChannel : IAsyncDisposable
         }
     }
 
-    private async Task WriteFixedAsync(int length, CancellationToken cancellationToken)
+    /// <summary>
+    /// Encodes and sends one fixed-size message.
+    /// </summary>
+    /// <remarks>
+    /// The buffer is rented per call rather than shared. Input arrives on the UI thread while pings are
+    /// sent from a timer, so a shared buffer would let two encodes interleave and put a mangled message
+    /// on the wire. These messages are at most 32 bytes, so the rental costs nothing measurable.
+    /// </remarks>
+    private async Task WriteFixedAsync(EncodeFixedMessage encode, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(DexControlEncoder.MaxFixedMessageSize);
         try
         {
-            await _stream.WriteAsync(_scratch.AsMemory(0, length), cancellationToken).ConfigureAwait(false);
-            await _stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            int length = encode(buffer);
+
+            await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await _stream.WriteAsync(buffer.AsMemory(0, length), cancellationToken).ConfigureAwait(false);
+                await _stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _writeGate.Release();
+            }
         }
         finally
         {
-            _writeGate.Release();
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 

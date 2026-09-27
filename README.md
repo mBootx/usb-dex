@@ -63,8 +63,12 @@ Smart Switch. DexStream releases the interface as soon as it stops, so you can s
 Both are built and uploaded by every green CI run:
 
 - **`DexStream.exe`** — portable, self-contained, one file, no installer and no prerequisites. The
-  device agent is embedded in it.
+  device agent is embedded in it, so nothing else needs to be copied alongside.
 - **`DexStream.msi`** — per-user install with a Start menu shortcut. No elevation required.
+
+Both are around 60 MB. That is the cost of a self-contained .NET build: the runtime and WPF travel
+inside the file so the machine needs nothing installed. Trimming would shrink it, but WPF does not
+support it.
 
 ## How it works
 

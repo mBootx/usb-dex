@@ -175,7 +175,7 @@ public sealed class DexStreamSession : IAsyncDisposable
             _transport = WinUsbAdbTransport.Open(_device, _loggerFactory.CreateLogger<WinUsbAdbTransport>());
 
             var keyStore = new AdbKeyStore(_loggerFactory.CreateLogger<AdbKeyStore>());
-            (AdbKeyPair key, AdbKeyStore.KeyOrigin origin) = keyStore.Load(reuseSystemKey: true);
+            (AdbKeyPair key, AdbKeyStore.KeyOrigin origin) = keyStore.Load(_options.ReuseSystemAdbKey);
 
             using (key)
             {

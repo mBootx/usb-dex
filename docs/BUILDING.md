@@ -34,6 +34,9 @@ wix build installer/DexStream.wxs -define "PublishDir=<full path to artifacts/po
 
 `PublishDir` must be an absolute path ending in a separator.
 
+Both outputs are around 60 MB, because a self-contained build carries the .NET runtime and WPF inside
+the file. `PublishTrimmed` would shrink it, but WPF does not support trimming.
+
 ## On Linux or macOS
 
 The Windows Desktop SDK is not part of the .NET SDK package on these platforms, so the WPF app cannot

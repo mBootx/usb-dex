@@ -146,6 +146,7 @@ public class SettingsStoreTests : IDisposable
             TurnPhoneScreenOff = false,
             RequireDexDisplay = true,
             ActivateDexIfMissing = false,
+            ReuseSystemAdbKey = false,
         };
 
         StreamSessionOptions options = settings.ToSessionOptions();
@@ -158,6 +159,7 @@ public class SettingsStoreTests : IDisposable
         Assert.False(options.TurnPhoneScreenOff);
         Assert.True(options.RequireDexDisplay);
         Assert.False(options.ActivateDexIfMissing);
+        Assert.False(options.ReuseSystemAdbKey);
     }
 
     [Fact]
