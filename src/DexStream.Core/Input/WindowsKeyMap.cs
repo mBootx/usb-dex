@@ -164,7 +164,7 @@ public static class WindowsKeyMap
             VkMediaStop => AndroidKeyCodes.MediaStop,
             VkMediaPlayPause => AndroidKeyCodes.MediaPlayPause,
             VkOem1 => AndroidKeyCodes.Semicolon,
-            VkOemPlus => AndroidKeyCodes.Equals,
+            VkOemPlus => AndroidKeyCodes.EqualsSign,
             VkOemComma => AndroidKeyCodes.Comma,
             VkOemMinus => AndroidKeyCodes.Minus,
             VkOemPeriod => AndroidKeyCodes.Period,

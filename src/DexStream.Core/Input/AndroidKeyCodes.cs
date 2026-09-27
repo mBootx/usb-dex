@@ -37,7 +37,8 @@ public static class AndroidKeyCodes
 
     public const int Grave = 68;
     public const int Minus = 69;
-    public const int Equals = 70;
+    /// <summary>The <c>=</c> key. Named <c>EqualsSign</c> so it does not hide <c>object.Equals</c>.</summary>
+    public const int EqualsSign = 70;
     public const int LeftBracket = 71;
     public const int RightBracket = 72;
     public const int Backslash = 73;

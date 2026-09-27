@@ -211,7 +211,7 @@ internal sealed class FakeAdbDevice
         rsa.ImportParameters(new RSAParameters
         {
             Modulus = modulus.ToByteArray(isUnsigned: true, isBigEndian: true),
-            Exponent = TrimLeadingZeros(BitConverter.GetBytes(exponent).Reverse().ToArray()),
+            Exponent = EncodeExponent(exponent),
         });
 
         return rsa.VerifyHash(_token, _pendingSignature, HashAlgorithmName.SHA1, RSASignaturePadding.Pkcs1);
@@ -321,15 +321,22 @@ internal sealed class FakeAdbDevice
         return Encoding.UTF8.GetString(payload, 0, end < 0 ? payload.Length : end);
     }
 
-    private static byte[] TrimLeadingZeros(byte[] value)
+    /// <summary>
+    /// Encodes the exponent the way <see cref="RSAParameters"/> wants it: big-endian, unsigned and
+    /// with no leading zero bytes.
+    /// </summary>
+    private static byte[] EncodeExponent(uint exponent)
     {
+        byte[] bigEndian = new byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(bigEndian, exponent);
+
         int start = 0;
-        while (start < value.Length - 1 && value[start] == 0)
+        while (start < bigEndian.Length - 1 && bigEndian[start] == 0)
         {
             start++;
         }
 
-        return value[start..];
+        return bigEndian[start..];
     }
 
     private sealed class DeviceStream(uint remoteId, uint localId, string service)

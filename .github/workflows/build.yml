@@ -74,3 +74,29 @@ jobs:
           name: windows-test-results
           path: artifacts/test-results
           if-no-files-found: ignore
+
+  # The device agent is plain javac plus d8, so it needs no Gradle. Two steps: a type-check against
+  # the signature-only stubs, which needs nothing but a JDK and fails fast, then the real build
+  # against the platform android.jar that produces the artifact shipped inside the host executable.
+  agent:
+    name: Device agent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Type-check against the Android stubs
+        run: agent/verify.sh
+
+      - name: Build the agent jar
+        run: agent/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dexstream-agent
+          path: agent/build/dexstream-agent.jar
+          if-no-files-found: error
