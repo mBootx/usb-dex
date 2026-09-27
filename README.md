@@ -6,9 +6,10 @@ and refresh rate the device offers.
 USB only. No wireless fallback, no network path, no ADB server, no administrator rights.
 
 > **Read [docs/VERIFICATION.md](docs/VERIFICATION.md) before you rely on any of this.** The project was
-> written without access to a Windows machine or a Galaxy device. The protocol layer is covered by 224
-> tests that run on every push and the whole thing compiles in CI, but nothing has been run against real
-> hardware. That page says exactly what is proven and what is not.
+> written without access to a Galaxy device. The protocol layer is covered by 229 tests that run on every
+> push, and CI launches the published executable on Windows to prove it starts, renders and exits
+> cleanly — but nothing has yet streamed from a real phone. That page says exactly what is proven and
+> what is not.
 
 ## What it does
 

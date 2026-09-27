@@ -26,7 +26,29 @@ These run in CI on Linux and Windows, and can be run locally with `dotnet test`.
 | Metrics | Percentiles, the sliding rate meter, and the clock synchroniser's offset derivation including drift recovery. |
 | Settings | Round-trip, a corrupt file falling back to defaults, and atomic replacement. |
 
-224 tests. `dotnet test tests/DexStream.Core.Tests`.
+229 tests. `dotnet test tests/DexStream.Core.Tests`.
+
+## Proven by running on Windows
+
+Every CI run launches the **published executable** — the exact file you download — on a Windows
+runner with `--smoke-test`. The app starts, renders its main window, confirms the device agent is
+embedded, runs for three seconds and exits; any exception, a window that never renders, a missing agent
+or a hung exit fails the build before the file is uploaded. That executes, on real Windows:
+
+- XAML parsing, resource dictionaries, styles and every binding in the main window.
+- WPF text layout and globalization.
+- The hosted child window the stream is presented into (class registration and window creation).
+- Settings, logging, and USB device enumeration through SetupAPI.
+- Orderly shutdown within its time bound.
+
+Separately, the USB test project runs SetupAPI enumeration on the Windows leg, so the P/Invoke
+declarations there are exercised at runtime, not only compiled.
+
+The smoke test earned its place on its first two runs. The first real launch crashed while rendering
+its first line of text, because invariant-globalization mode — set repo-wide and harmless for the
+libraries — is fatal to WPF. The second rendered correctly and then hung on exit, from a sync-over-async
+deadlock in teardown that would have left a zombie process holding the phone's USB interface. Both are
+fixed and both now fail the build if they return.
 
 ## Proven to compile
 
@@ -44,9 +66,9 @@ The Media Foundation and Direct3D 11 code is written against API signatures read
 assemblies by reflection rather than from memory, so the names, overloads and struct layouts are
 correct. Interface IIDs come from `Type.GUID` rather than being hardcoded.
 
-## Not verified: needs a Windows machine
+## Not verified: needs a Windows machine with a GPU, or a device
 
-Compiling is not running. None of the following has been executed:
+Starting is not streaming. None of the following has been executed:
 
 - **WinUSB transport.** Opening the ADB interface, the pipe policies, and the bulk read and write
   loops. The pipe policy combination (`ALLOW_PARTIAL_READS` on, `AUTO_FLUSH` off) is what gives the
@@ -55,7 +77,9 @@ Compiling is not running. None of the following has been executed:
 - **Media Foundation decode.** Type negotiation, the D3D11 device handover, and the
   `ProcessInput`/`ProcessOutput` loop.
 - **Direct3D presentation.** Swap chain creation, the video processor, and `VideoProcessorBlt`.
-- **The WPF shell**, including whether mouse capture and the airspace split behave as intended.
+- **The WPF shell under real use.** It starts, renders and exits on Windows (see above), but mouse
+  capture, the airspace split between WPF and the stream window, and input routing have only been
+  exercised by a developer's reading, not by a mouse.
 - **The MSI**, beyond the fact that WiX builds it.
 
 ## Not verified: needs a Galaxy device
