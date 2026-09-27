@@ -1,4 +1,3 @@
-using DexStream.Core.Device;
 using DexStream.Core.Session;
 using DexStream.Core.Settings;
 using DexStream.Usb;
@@ -156,11 +155,11 @@ public sealed class DeviceCoordinator : IAsyncDisposable
         Devices = _watcher.CurrentDevices.ToArray();
         DevicesChanged?.Invoke(Devices);
 
-        DexSupportInfo support = SamsungDeviceCatalog.Lookup(null, device.IsSamsung ? "samsung" : null);
+        // Nothing can be said about DeX support yet: the model is only readable once ADB is up.
         Report(new SessionStatus(
             SessionState.DeviceReady,
             $"{device.Description} connected.",
-            support.Notes));
+            device.IsSamsung ? null : "This is not a Samsung device, so there is no DeX desktop to stream."));
     }
 
     private void OnDeviceDisconnected(UsbDeviceInfo device)

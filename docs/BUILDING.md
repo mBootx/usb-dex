@@ -92,9 +92,9 @@ agent/build.sh
 copy agent\build\dexstream-agent.jar <folder containing DexStream.exe>
 ```
 
-A jar next to the executable takes precedence over nothing — the embedded copy wins — so for this to
-work, publish a build made without the jar present, or run the app from `bin/` where the repository
-lookup finds `agent/build/` automatically.
+The embedded copy wins when there is one, so this only helps for a build published without the jar
+present. The simplest loop is to run the app from `bin/` instead, where the lookup walks up to the
+repository root and finds `agent/build/dexstream-agent.jar` on its own.
 
 ## Continuous integration
 

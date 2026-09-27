@@ -141,8 +141,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
                 return "No device connected";
             }
 
-            string model = _session?.Model ?? device.Description;
-            DexSupportInfo support = _session?.Support ?? default;
+            // DeX support is only known once ADB is up and ro.product.model has been read. Before that,
+            // describe the USB device and claim nothing: saying "not a DeX device" about a Galaxy S25
+            // because the model has not been queried yet would be worse than saying nothing.
+            if (_session?.Model is not { Length: > 0 } model)
+            {
+                return device.Description;
+            }
+
+            DexSupportInfo support = _session.Support;
 
             return support.Level switch
             {
