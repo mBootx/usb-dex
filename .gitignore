@@ -1,0 +1,23 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Agent build output
+agent/build/
+agent/out/
+*.class
+
+# Installer output
+installer/obj/
+installer/bin/
+*.wixpdb
+
+# Local tooling
+.dotnet/
+.tools/

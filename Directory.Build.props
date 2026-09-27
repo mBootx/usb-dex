@@ -1,0 +1,22 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>CS8600;CS8602;CS8603;CS8618</WarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Product>DexStream</Product>
+    <Company>DexStream</Company>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <!-- Allows `dotnet build` of net8.0-windows / WPF projects from Linux and macOS
+         (used by local development and by the Linux CI leg that runs the Core tests). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+</Project>
