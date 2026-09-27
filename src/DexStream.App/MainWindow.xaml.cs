@@ -65,6 +65,25 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Re-reports the surface size when the window moves to a monitor with a different scale factor.
+    /// </summary>
+    /// <remarks>
+    /// Dragging the window between a 100% and a 150% monitor changes its size in physical pixels while
+    /// leaving its size in device-independent units alone, so SizeChanged does not fire. Without this,
+    /// the swap chain would keep the old pixel size and the image would be rescaled by the compositor.
+    /// </remarks>
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+
+        if (Surface.Session is { } session)
+        {
+            (int width, int height) = Surface.PixelSize;
+            session.SetClientSize(width, height);
+        }
+    }
+
     private void OnSettingsClick(object sender, RoutedEventArgs e)
     {
         var dialog = new SettingsWindow(_viewModel.Settings) { Owner = this };

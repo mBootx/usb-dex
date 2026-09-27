@@ -70,3 +70,13 @@ pairs at all, in which case no ADB interface appears.
 - A GPU supporting Direct3D 11.0 with video decode — every discrete GPU and every Intel iGPU since
   Haswell. H.264 decode is universal; HEVC needs either a reasonably recent GPU or the HEVC Video
   Extension from the Microsoft Store.
+
+## Multiple monitors
+
+The DexStream window can be moved, resized and maximised on any monitor, including monitors at
+different scale factors. It is per-monitor DPI aware, and the swap chain is resized in physical pixels
+whenever the window's size or its monitor's scale factor changes, so the image is always rendered at
+the monitor's real resolution rather than being bitmap-stretched by the compositor.
+
+What DexStream does not do is spread one DeX desktop across several PC monitors, or present the same
+stream into two windows at once. One session drives one window.

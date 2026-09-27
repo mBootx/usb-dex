@@ -114,6 +114,10 @@ Desktop SDK. Everything else can, and the app's C# can still be type-checked. Se
 - **DeX cannot be started from the PC.** Samsung's own DeX for PC was discontinued and its protocol was
   never published. Start DeX on the phone, or let DexStream create a display of its own.
 - **No audio.** Video and input only.
+- **One pointer.** Mouse movement, all five buttons, hover and the wheel are forwarded; multi-touch
+  gestures are not, because a mouse cannot express them.
+- **One window per session.** The window works on any monitor at any scale factor, but a DeX desktop is
+  not spread across several PC monitors.
 - **x64 only.** An ARM64 build needs a second runtime identifier in the publish profile.
 - **Secure surfaces appear black.** Android blanks capture of DRM-protected content. This is by design
   in the platform, not a bug here.
