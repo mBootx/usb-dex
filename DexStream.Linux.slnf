@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "DexStream.sln",
+    "projects": [
+      "src\\DexStream.Core\\DexStream.Core.csproj",
+      "src\\DexStream.Media\\DexStream.Media.csproj",
+      "src\\DexStream.Usb\\DexStream.Usb.csproj",
+      "tests\\DexStream.Core.Tests\\DexStream.Core.Tests.csproj",
+      "tests\\DexStream.Usb.Tests\\DexStream.Usb.Tests.csproj"
+    ]
+  }
+}

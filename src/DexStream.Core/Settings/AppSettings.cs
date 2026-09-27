@@ -36,8 +36,8 @@ public sealed record AppSettings
     /// <summary>Keep the window on top of other windows while streaming.</summary>
     public bool AlwaysOnTop { get; init; }
 
-    /// <summary>Show the metrics overlay on top of the stream.</summary>
-    public bool ShowMetricsOverlay { get; init; } = true;
+    /// <summary>Show the metrics bar beneath the stream.</summary>
+    public bool ShowMetricsBar { get; init; } = true;
 
     public StreamSessionOptions ToSessionOptions() => new()
     {

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DexStream.App</RootNamespace>
+    <AssemblyName>DexStream</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Description>Streams Samsung DeX from a USB-connected Galaxy device.</Description>
+
+    <!-- Portable single file: one .exe with no prerequisites, which is the primary deliverable. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <!-- Server GC would add latency spikes in a 120fps present loop for no benefit here. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DexStream.Core\DexStream.Core.csproj" />
+    <ProjectReference Include="..\DexStream.Usb\DexStream.Usb.csproj" />
+    <ProjectReference Include="..\DexStream.Media\DexStream.Media.csproj" />
+  </ItemGroup>
+
+  <!-- The device agent is embedded when it has been built, so the single .exe carries everything it
+       needs. Without it the app falls back to a jar next to the executable and says so in the UI. -->
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\agent\build\dexstream-agent.jar')">
+    <EmbeddedResource Include="..\..\agent\build\dexstream-agent.jar" LogicalName="DexStream.Agent.jar" />
+  </ItemGroup>
+
+</Project>

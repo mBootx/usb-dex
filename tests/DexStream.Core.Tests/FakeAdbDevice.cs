@@ -63,7 +63,10 @@ internal sealed class FakeAdbDevice
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         byte[] header = new byte[AdbProtocol.HeaderSize];
-        uint nextRemoteId = 100;
+
+        // Every ADB message carries the sender's stream id in arg0 and the recipient's in arg1, so on
+        // this side of the wire arg1 is always one of our own ids.
+        uint nextDeviceId = 100;
 
         try
         {
@@ -103,21 +106,22 @@ internal sealed class FakeAdbDevice
                             break;
                         }
 
-                        uint remoteId = nextRemoteId++;
-                        var stream = new DeviceStream(remoteId, arg0, service);
-                        _streams[arg0] = stream;
-                        Send(AdbCommand.Okay, remoteId, arg0, []);
+                        // arg0 of an OPEN is the host's stream id; the device picks its own.
+                        uint deviceId = nextDeviceId++;
+                        var stream = new DeviceStream(deviceId, arg0, service);
+                        _streams[deviceId] = stream;
+                        Send(AdbCommand.Okay, deviceId, arg0, []);
 
                         if (ShellResponses.TryGetValue(service, out string? response))
                         {
-                            Send(AdbCommand.Write, remoteId, arg0, Encoding.UTF8.GetBytes(response));
+                            Send(AdbCommand.Write, deviceId, arg0, Encoding.UTF8.GetBytes(response));
                         }
 
                         if (service.StartsWith("shell:", StringComparison.Ordinal))
                         {
                             // The legacy shell service closes the stream when the command exits.
-                            Send(AdbCommand.Close, remoteId, arg0, []);
-                            _streams.Remove(arg0);
+                            Send(AdbCommand.Close, deviceId, arg0, []);
+                            _streams.Remove(deviceId);
                         }
 
                         break;
@@ -125,9 +129,10 @@ internal sealed class FakeAdbDevice
 
                     case AdbCommand.Write:
                     {
+                        // arg1 is the recipient's id, so it is the device's own stream id here.
                         if (_streams.TryGetValue(arg1, out DeviceStream? stream))
                         {
-                            Send(AdbCommand.Okay, stream.RemoteId, arg1, []);
+                            Send(AdbCommand.Okay, stream.DeviceId, stream.HostId, []);
                             HandleStreamData(stream, payload);
                         }
 
@@ -273,16 +278,16 @@ internal sealed class FakeAdbDevice
                         PushedFiles[stream.SyncPath] = stream.SyncContent.ToArray();
                     }
 
-                    Send(AdbCommand.Write, stream.RemoteId, stream.LocalId, SyncStatus("OKAY"));
+                    Send(AdbCommand.Write, stream.DeviceId, stream.HostId, SyncStatus("OKAY"));
                     break;
 
                 case "QUIT":
                     buffer.RemoveRange(0, 8);
-                    Send(AdbCommand.Close, stream.RemoteId, stream.LocalId, []);
+                    Send(AdbCommand.Close, stream.DeviceId, stream.HostId, []);
                     return;
 
                 default:
-                    Send(AdbCommand.Write, stream.RemoteId, stream.LocalId, SyncStatus("FAIL"));
+                    Send(AdbCommand.Write, stream.DeviceId, stream.HostId, SyncStatus("FAIL"));
                     return;
             }
         }
@@ -339,11 +344,13 @@ internal sealed class FakeAdbDevice
         return bigEndian[start..];
     }
 
-    private sealed class DeviceStream(uint remoteId, uint localId, string service)
+    private sealed class DeviceStream(uint deviceId, uint hostId, string service)
     {
-        public uint RemoteId { get; } = remoteId;
+        /// <summary>The id this simulated device assigned to the stream.</summary>
+        public uint DeviceId { get; } = deviceId;
 
-        public uint LocalId { get; } = localId;
+        /// <summary>The id the host assigned to the same stream.</summary>
+        public uint HostId { get; } = hostId;
 
         public string Service { get; } = service;
 

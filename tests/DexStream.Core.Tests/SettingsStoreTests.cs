@@ -42,7 +42,7 @@ public class SettingsStoreTests : IDisposable
             AutoStartOnConnect = false,
             ReuseSystemAdbKey = false,
             AlwaysOnTop = true,
-            ShowMetricsOverlay = false,
+            ShowMetricsBar = false,
         };
 
         store.Save(original);

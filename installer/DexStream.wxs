@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Per-user MSI for DexStream.
+
+  Scope="perUser" is deliberate: DexStream needs no administrative rights at any point. WinUSB device
+  access is granted to the interactive user, and everything the app writes (settings, ADB key, log)
+  lives under %LOCALAPPDATA%. A per-machine install would demand elevation for no benefit.
+
+  The payload is the single self-contained executable produced by `dotnet publish`, so the package is
+  one file plus a Start menu shortcut.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="DexStream"
+           Manufacturer="DexStream"
+           Version="$(Version)"
+           UpgradeCode="6C1D8E8A-3F5B-4F2A-9C7B-1E9A4D2B7F31"
+           Scope="perUser"
+           Compressed="yes">
+
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of DexStream is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="DexStream" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="DexStream" />
+    </StandardDirectory>
+
+    <Component Id="MainExecutable" Directory="INSTALLFOLDER">
+      <File Id="DexStreamExe" Source="$(PublishDir)DexStream.exe" KeyPath="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Directory="ShortcutFolder"
+                  Name="DexStream"
+                  Description="Stream Samsung DeX over USB"
+                  Advertise="no" />
+      </File>
+      <RemoveFolder Id="RemoveShortcutFolder" Directory="ShortcutFolder" On="uninstall" />
+    </Component>
+
+    <Feature Id="Main" Title="DexStream" Level="1">
+      <ComponentRef Id="MainExecutable" />
+    </Feature>
+
+  </Package>
+</Wix>

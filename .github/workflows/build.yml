@@ -12,8 +12,8 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  # Fast leg: the platform-neutral core compiles and its tests pass on Linux. This is where the ADB
-  # protocol, key encoding, framing, input mapping and geometry are verified.
+  # Fast leg. Builds and tests everything that does not need the Windows Desktop SDK, which is where
+  # the ADB protocol, key encoding, framing, input mapping and geometry are verified.
   core:
     name: Core build and tests (Linux)
     runs-on: ubuntu-latest
@@ -25,12 +25,12 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore
-        run: dotnet restore DexStream.sln
+        run: dotnet restore DexStream.Linux.slnf
 
       - name: Build
-        run: dotnet build DexStream.sln --configuration Release --no-restore
+        run: dotnet build DexStream.Linux.slnf --configuration Release --no-restore
 
-      - name: Test (Core)
+      - name: Test
         run: >-
           dotnet test tests/DexStream.Core.Tests/DexStream.Core.Tests.csproj
           --configuration Release --no-build
@@ -44,8 +44,7 @@ jobs:
           path: artifacts/test-results
           if-no-files-found: ignore
 
-  # Full leg: everything, including the Windows-only USB, media and WPF projects, plus the packaged
-  # outputs. This is the build that has to be green before a release.
+  # Authoritative leg: the whole solution including the WPF app, plus both shipping artifacts.
   windows:
     name: Full build, tests and package (Windows)
     runs-on: windows-latest
@@ -75,9 +74,47 @@ jobs:
           path: artifacts/test-results
           if-no-files-found: ignore
 
-  # The device agent is plain javac plus d8, so it needs no Gradle. Two steps: a type-check against
-  # the signature-only stubs, which needs nothing but a JDK and fails fast, then the real build
-  # against the platform android.jar that produces the artifact shipped inside the host executable.
+      # The portable deliverable: one self-contained .exe with no prerequisites.
+      - name: Publish the portable executable
+        run: >-
+          dotnet publish src/DexStream.App/DexStream.App.csproj
+          --configuration Release
+          --output artifacts/portable
+
+      - name: Report the portable size
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts/portable -Filter *.exe |
+            ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DexStream-portable
+          path: artifacts/portable/DexStream.exe
+          if-no-files-found: error
+
+      # The installer deliverable. Per-user, so it needs no elevation to install.
+      - name: Install the WiX tool
+        run: dotnet tool install --global wix --version 5.0.2
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $publishDir = (Resolve-Path artifacts/portable).Path + [IO.Path]::DirectorySeparatorChar
+          New-Item -ItemType Directory -Force -Path artifacts/installer | Out-Null
+          wix build installer/DexStream.wxs `
+            -define "PublishDir=$publishDir" `
+            -define "Version=0.1.0.0" `
+            -out artifacts/installer/DexStream.msi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DexStream-installer
+          path: artifacts/installer/DexStream.msi
+          if-no-files-found: error
+
+  # The device agent is plain javac plus d8, so it needs no Gradle. The stub type-check needs only a
+  # JDK and fails fast; the real build produces the jar that gets embedded in the host executable.
   agent:
     name: Device agent
     runs-on: ubuntu-latest
