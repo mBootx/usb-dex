@@ -9,7 +9,6 @@ using DexStream.App.Services;
 using DexStream.Core.Device;
 using DexStream.Core.Metrics;
 using DexStream.Core.Protocol;
-using DexStream.Core.Rendering;
 using DexStream.Core.Settings;
 using DexStream.Usb;
 using Microsoft.Extensions.Logging;
@@ -62,8 +61,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
         _coordinator.AgentLog += OnAgentLog;
         _coordinator.SessionChanged += OnSessionChanged;
 
-        StartCommand = new RelayCommand(async () => await StartAsync(), () => CanStart);
-        StopCommand = new RelayCommand(async () => await StopAsync(), () => CanStop);
+        StartCommand = new RelayCommand(StartAsync, () => CanStart);
+        StopCommand = new RelayCommand(StopAsync, () => CanStop);
         CopyDiagnosticsCommand = new RelayCommand(CopyDiagnostics, () => Log.Count > 0);
         BackCommand = new RelayCommand(() => SendSystemAction(DexSystemAction.Back), () => IsStreaming);
         HomeCommand = new RelayCommand(() => SendSystemAction(DexSystemAction.Home), () => IsStreaming);

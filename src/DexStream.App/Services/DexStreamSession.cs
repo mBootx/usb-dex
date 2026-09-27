@@ -58,7 +58,8 @@ public sealed class DexStreamSession : IAsyncDisposable
 
     private volatile int _pendingClientWidth;
     private volatile int _pendingClientHeight;
-    private volatile Viewport _viewport = Viewport.Empty;
+    private ViewportSnapshot _viewport = new(Viewport.Empty);
+    private Viewport _lastPublishedViewport = Viewport.Empty;
     private volatile int _streamWidth;
     private volatile int _streamHeight;
     private ScalingMode _scaling;
@@ -111,7 +112,29 @@ public sealed class DexStreamSession : IAsyncDisposable
     public (int Width, int Height) StreamSize => (_streamWidth, _streamHeight);
 
     /// <summary>Where the image sits in the window. Safe to read from the UI thread.</summary>
-    public Viewport Viewport => _viewport;
+    public Viewport Viewport => Volatile.Read(ref _viewport).Value;
+
+    /// <summary>
+    /// Holder that lets the multi-field <see cref="Core.Rendering.Viewport"/> be published atomically.
+    /// A volatile field has to be a single machine word, and a torn read here would put mouse input in
+    /// the wrong place.
+    /// </summary>
+    private sealed record ViewportSnapshot(Viewport Value);
+
+    /// <summary>
+    /// Publishes the viewport for the UI thread, allocating only when it actually changed rather than
+    /// once per presented frame.
+    /// </summary>
+    private void PublishViewport(Viewport viewport)
+    {
+        if (viewport == _lastPublishedViewport)
+        {
+            return;
+        }
+
+        _lastPublishedViewport = viewport;
+        Volatile.Write(ref _viewport, new ViewportSnapshot(viewport));
+    }
 
     public SessionStatus Status { get; private set; } =
         new(SessionState.DeviceReady, "Device connected.");
@@ -460,7 +483,7 @@ public sealed class DexStreamSession : IAsyncDisposable
                 _loggerFactory.CreateLogger<D3D11VideoPipeline>());
             _pipeline.Scaling = _scaling;
             DecoderName = _pipeline.DecoderName;
-            _viewport = _pipeline.Viewport;
+            PublishViewport(_pipeline.Viewport);
 
             Report(
                 SessionState.Streaming,
@@ -543,7 +566,7 @@ public sealed class DexStreamSession : IAsyncDisposable
                 ? _clock.ToHostTimeUs((long)packet.Header.PresentationTimeUs)
                 : null;
             _metrics.OnFramePresented(captureHostTime, arrival);
-            _viewport = _pipeline.Viewport;
+            PublishViewport(_pipeline.Viewport);
         }
         else if (!isConfig)
         {
@@ -557,7 +580,7 @@ public sealed class DexStreamSession : IAsyncDisposable
         _streamWidth = header.Width;
         _streamHeight = header.Height;
         _pipeline!.UpdateSourceGeometry(header);
-        _viewport = _pipeline.Viewport;
+        PublishViewport(_pipeline.Viewport);
 
         Report(
             SessionState.Streaming,
@@ -576,7 +599,7 @@ public sealed class DexStreamSession : IAsyncDisposable
         }
 
         _pipeline.Resize(width, height);
-        _viewport = _pipeline.Viewport;
+        PublishViewport(_pipeline.Viewport);
     }
 
     /// <summary>Tells the session the window's client area changed size, in physical pixels.</summary>
@@ -658,7 +681,7 @@ public sealed class DexStreamSession : IAsyncDisposable
             return Task.CompletedTask;
         }
 
-        Viewport viewport = _viewport;
+        Viewport viewport = Viewport;
         if (viewport.IsEmpty)
         {
             return Task.CompletedTask;
@@ -693,7 +716,7 @@ public sealed class DexStreamSession : IAsyncDisposable
             return Task.CompletedTask;
         }
 
-        Viewport viewport = _viewport;
+        Viewport viewport = Viewport;
         if (viewport.IsEmpty)
         {
             return Task.CompletedTask;

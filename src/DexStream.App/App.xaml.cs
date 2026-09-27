@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Threading;
 using DexStream.App.Services;
 using DexStream.App.ViewModels;
-using DexStream.App.Views;
 using DexStream.Core.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -41,7 +40,7 @@ public partial class App : Application
             coordinator, settingsStore, _loggerFactory.CreateLogger<MainViewModel>());
 
         var window = new MainWindow(_viewModel);
-        MainWindow = window;
+        this.MainWindow = window;
         window.Show();
 
         // Started after the window exists so the first device event has somewhere to be displayed.

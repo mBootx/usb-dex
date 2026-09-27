@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Type-checks DexStream.App's hand-written C# on a machine without the Windows Desktop SDK.
+
+    The Linux .NET SDK package does not ship that SDK, so a WPF project cannot be built there at all
+    and the whole app would otherwise only be verified on Windows. This project sidesteps the problem:
+    a FrameworkReference pulls the WPF reference assemblies from NuGet, which works anywhere, and the
+    app's source files are compiled directly. What it cannot do is compile the XAML, so the markup
+    compiler's output is stood in for by XamlGeneratedStubs.cs.
+
+    It produces no shipping artifact. If it fails but the Windows build passes, the stub file has
+    drifted from the x:Name'd elements in the XAML; add the missing field there.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>DexStream.App.TypeCheck</AssemblyName>
+    <RootNamespace>DexStream.App</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+
+    <!-- The app really is Windows-only; this project exists to check its code, not its portability. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DexStream.Core\DexStream.Core.csproj" />
+    <ProjectReference Include="..\..\src\DexStream.Usb\DexStream.Usb.csproj" />
+    <ProjectReference Include="..\..\src\DexStream.Media\DexStream.Media.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\DexStream.App\**\*.cs" />
+    <Compile Include="XamlGeneratedStubs.cs" />
+    <Compile Include="XamlGeneratedStubs.Views.cs" />
+  </ItemGroup>
+
+</Project>

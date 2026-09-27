@@ -37,6 +37,14 @@ jobs:
           --logger "trx;LogFileName=core-tests.trx"
           --results-directory artifacts/test-results
 
+      # The WPF app cannot be built here (the Linux SDK omits the Windows Desktop SDK), but its C#
+      # can still be type-checked against the WPF reference assemblies. Catches app-level mistakes in
+      # this fast leg instead of only on Windows.
+      - name: Type-check the app's C#
+        run: >-
+          dotnet build tools/DexStream.App.TypeCheck/DexStream.App.TypeCheck.csproj
+          --configuration Release
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
