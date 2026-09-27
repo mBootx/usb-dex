@@ -17,6 +17,12 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
 
+    <!-- WPF needs real culture data: it builds CultureInfo objects for text layout and for every
+         binding, and in invariant-globalization mode those constructors throw, so the main window dies
+         the first time it measures a TextBlock. Pinned off here explicitly because a project's own value
+         wins over a Directory.Build.props, so a repo-wide setting cannot break the app again. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+
     <!-- Server GC would add latency spikes in a 120fps present loop for no benefit here. -->
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>

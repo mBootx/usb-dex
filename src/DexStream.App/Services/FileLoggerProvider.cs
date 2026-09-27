@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
     /// <summary>Rotate once the file passes this size, keeping one previous generation.</summary>
     private const long MaxFileBytes = 4 * 1024 * 1024;
 
-    private readonly BlockingCollection<string> _queue = new(new ConcurrentQueue<string>(), 4096);
+    private readonly BlockingCollection<LogEntry> _queue = new(new ConcurrentQueue<LogEntry>(), 4096);
     private readonly Thread _writer;
     private readonly string _path;
     private bool _disposed;
@@ -53,6 +54,30 @@ public sealed class FileLoggerProvider : ILoggerProvider
 
     public ILogger CreateLogger(string categoryName) => new FileLogger(this, categoryName);
 
+    /// <summary>
+    /// Waits until everything logged so far is on disk, or until <paramref name="timeout"/> passes.
+    /// </summary>
+    /// <remarks>
+    /// Writes are asynchronous, which is right for normal operation but wrong for a fatal error: the
+    /// process can end before the writer thread gets to the line explaining why. Call this before
+    /// exiting or showing a crash dialog so that line is never the one that gets lost.
+    /// </remarks>
+    public void Flush(TimeSpan timeout)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        // Not disposed after the wait: on timeout the writer may still signal it later, and a
+        // ManualResetEventSlim that never allocated a kernel handle needs no disposal anyway.
+        var flushed = new ManualResetEventSlim(false);
+        if (_queue.TryAdd(new LogEntry(null, flushed), timeout))
+        {
+            flushed.Wait(timeout);
+        }
+    }
+
     private void Rotate()
     {
         var info = new FileInfo(_path);
@@ -75,7 +100,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
 
         // Dropping a line under extreme pressure is better than stalling the caller, which could be
         // the video thread.
-        _queue.TryAdd(line);
+        _queue.TryAdd(new LogEntry(line, null));
     }
 
     private void WriteLoop()
@@ -86,16 +111,21 @@ public sealed class FileLoggerProvider : ILoggerProvider
                 _path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, 4096);
             using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = false };
 
-            foreach (string line in _queue.GetConsumingEnumerable())
+            foreach (LogEntry entry in _queue.GetConsumingEnumerable())
             {
-                writer.WriteLine(line);
+                if (entry.Line is not null)
+                {
+                    writer.WriteLine(entry.Line);
+                }
 
                 // Flush whenever the queue drains, so the file is current whenever anything is idle
-                // but a burst still gets batched.
-                if (_queue.Count == 0)
+                // but a burst still gets batched, and always when someone is waiting on it.
+                if (entry.Flushed is not null || _queue.Count == 0)
                 {
                     writer.Flush();
                 }
+
+                entry.Flushed?.Set();
             }
 
             writer.Flush();
@@ -118,6 +148,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
         _writer.Join(TimeSpan.FromSeconds(2));
         _queue.Dispose();
     }
+
+    /// <summary>A line to write, or — when <see cref="Line"/> is null — a request to flush and signal.</summary>
+    private readonly record struct LogEntry(string? Line, ManualResetEventSlim? Flushed);
 
     private sealed class FileLogger : ILogger
     {
@@ -150,7 +183,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
             }
 
             var line = new StringBuilder(160);
-            line.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))
+            // Invariant culture: in a custom format ':' is the culture's time separator, so without it
+            // the log's timestamps would change shape with the user's regional settings.
+            line.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture))
                 .Append(' ')
                 .Append(Abbreviate(logLevel))
                 .Append(' ')

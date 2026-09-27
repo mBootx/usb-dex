@@ -141,6 +141,45 @@ jobs:
           Get-ChildItem artifacts/portable -Filter *.exe |
             ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
 
+      # Runs the executable that is about to be uploaded. Compiling proves nothing about XAML resources,
+      # bindings, text layout, globalization or the hosted swap-chain window; this executes all of them
+      # on Windows, and fails the build rather than publishing an exe that cannot start. The app writes
+      # its own log, which is printed either way so a failure explains itself.
+      - name: Smoke-test the published executable
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path artifacts/portable/DexStream.exe).Path
+          $log = Join-Path $env:LOCALAPPDATA 'DexStream\dexstream.log'
+          if (Test-Path $log) { Remove-Item $log }
+
+          $startInfo = [System.Diagnostics.ProcessStartInfo]::new($exe, '--smoke-test')
+          $startInfo.UseShellExecute = $false
+          $process = [System.Diagnostics.Process]::Start($startInfo)
+          $finished = $process.WaitForExit(120000)
+          if (-not $finished) { $process.Kill() }
+
+          New-Item -ItemType Directory -Force -Path artifacts/smoke | Out-Null
+          if (Test-Path $log) {
+            Copy-Item $log artifacts/smoke/dexstream.log
+            Get-Content $log
+          } else {
+            'The app wrote no log at all, so it failed before logging was set up.'
+          }
+
+          if (-not $finished) { throw 'The app did not exit within 120 seconds.' }
+          $meaning = @{ 1 = 'an unhandled exception'; 2 = 'the window never rendered'; 3 = 'the agent is not embedded' }
+          if ($process.ExitCode -ne 0) {
+            throw "Smoke test failed with exit code $($process.ExitCode): $($meaning[$process.ExitCode])."
+          }
+          'Smoke test passed: the published executable starts, renders and exits cleanly.'
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-test-log
+          path: artifacts/smoke
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v4
         with:
           name: DexStream-portable
